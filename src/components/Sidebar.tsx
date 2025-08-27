@@ -25,6 +25,7 @@ interface MenuItemChild {
   title: string;
   href: string;
   badge?: string;
+  icon?: React.ElementType;
 }
 
 interface MenuItem {
@@ -56,7 +57,17 @@ const VisualSidebar: React.FC<VisualSidebarProps> = ({ isOpen, onClose, userInfo
     if (userRole === 'admin') {
       return [
         { id: "dashboard", title: "Dashboard", icon: LayoutDashboard, href: "/dashboard/admin" },
-        { id: "users", title: "Users", icon: Users, href: "/dashboard/admin/users" },
+        {
+          id: "users",
+          title: "Users",
+          icon: Users,
+          expandable: true,
+          children: [
+            { title: "All Users", href: "/dashboard/admin/users", icon: Users },
+            { title: "Verification", href: "/dashboard/admin/users/verification", icon: UserCheck },
+            { title: "Activity & Logs", href: "/dashboard/admin/users/activity", icon: Activity }
+          ]
+        },
         { id: "transactions", title: "Transactions", icon: CreditCard, href: "/dashboard/admin/transactions" },
         { id: "financial", title: "Financial", icon: TrendingUp, href: "/dashboard/admin/financial" },
         { id: "analytics", title: "Analytics", icon: BarChart3, href: "/dashboard/admin/analytics" },
@@ -68,12 +79,12 @@ const VisualSidebar: React.FC<VisualSidebarProps> = ({ isOpen, onClose, userInfo
     // --- MENU BUSINESS ---
     else if (userRole === 'business') {
       return [
-        { id: "dashboard", title: "Dashboard", icon: LayoutDashboard, href: "/dashboard/business" },
-        { id: "team", title: "Team Management", icon: Users, expandable: true, children: [ /* ... */ ], href: "/dashboard/business/team" },
-        { id: "transactions", title: "Corporate Transactions", icon: CreditCard, expandable: true, children: [ /* ... */ ], href: "/dashboard/business/transactions" },
-        { id: "approvals", title: "Approval Workflow", icon: CheckCircle, href: "/dashboard/business/approvals" },
-        { id: "analytics", title: "Financial Analytics", icon: BarChart3, expandable: true, children: [ /* ... */ ], href: "/dashboard/business/analytics" },
-        { id: "settings", title: "Business Settings", icon: Settings, href: "/dashboard/business/settings" },
+  { id: "dashboard", title: "Dashboard", icon: LayoutDashboard, href: "/dashboard/business" },
+  { id: "team", title: "Team Management", icon: Users, expandable: true, href: "/dashboard/business/team" },
+  { id: "transactions", title: "Corporate Transactions", icon: CreditCard, expandable: true, href: "/dashboard/business/transactions" },
+  { id: "approvals", title: "Approval Workflow", icon: CheckCircle, href: "/dashboard/business/approvals" },
+  { id: "analytics", title: "Financial Analytics", icon: BarChart3, expandable: true, href: "/dashboard/business/analytics" },
+  { id: "settings", title: "Business Settings", icon: Settings, href: "/dashboard/business/settings" },
       ];
     }
     // --- MENU UTILISATEUR PAR DÉFAUT ---
@@ -90,6 +101,7 @@ const VisualSidebar: React.FC<VisualSidebarProps> = ({ isOpen, onClose, userInfo
   }, [userRole]);
 
   const menuItems = getMenuItems();
+  const [expandedMenuId, setExpandedMenuId] = useState<string | null>(null);
 
   return (
     <>
@@ -126,69 +138,107 @@ const VisualSidebar: React.FC<VisualSidebarProps> = ({ isOpen, onClose, userInfo
           {/* Navigation (Statique) */}
           <nav className="flex-1 p-4 space-y-1">
             {menuItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.id}
-                  href={item.href!}
-                  className={`w-full flex items-center justify-between p-3 rounded-lg text-left cursor-pointer transition-colors ${isActive ? 'bg-black text-white font-bold' : 'bg-white text-black'}`}
-                  style={isActive ? { boxShadow: '0 0 0 2px #000' } : {}}
-                >
-                  <div className="flex items-center gap-3">
-                    <item.icon className="w-5 h-5" />
-                    <span>{item.title}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {item.expandable && (
-                      <ChevronRight className="w-4 h-4" />
+              const isActive = item.href && pathname === item.href;
+              if (item.href) {
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg text-left cursor-pointer transition-colors ${isActive ? 'bg-black text-white font-bold' : 'bg-white text-black'}`}
+                    style={isActive ? { boxShadow: '0 0 0 2px #000' } : {}}
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className="w-5 h-5" />
+                      <span>{item.title}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {item.expandable && (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </div>
+                  </Link>
+                );
+              } else if (item.expandable && item.children) {
+                // Non-clickable parent (expandable) with children
+                const expanded = expandedMenuId === item.id;
+                const isAnyChildActive = item.children.some(child => pathname === child.href);
+                // Parent active only if submenu is closed and a child is active
+                const parentActive = isAnyChildActive && !expanded;
+                return (
+                  <div key={item.id}>
+                    <div
+                      className={`w-full flex items-center justify-between p-3 rounded-lg text-left cursor-pointer transition-colors ${parentActive ? 'bg-black text-white font-bold' : 'bg-white text-black'}`}
+                      style={parentActive ? { boxShadow: '0 0 0 2px #000' } : {}}
+                      onClick={() => setExpandedMenuId(expanded ? null : item.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon className="w-5 h-5" />
+                        <span>{item.title}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <ChevronRight className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+                      </div>
+                    </div>
+                    {expanded && (
+                      <div className="ml-8 space-y-1">
+                        {item.children.map((child) => {
+                          const isChildActive = pathname === child.href;
+                          const ChildIcon = child.icon;
+                          return (
+                            <Link
+                              key={child.title}
+                              href={child.href}
+                              className={`flex items-center gap-2 block p-2 rounded-lg text-sm transition-colors ${isChildActive ? 'bg-black text-white font-bold' : 'text-black hover:bg-gray-100'}`}
+                              style={isChildActive ? { boxShadow: '0 0 0 2px #000' } : {}}
+                            >
+                              {ChildIcon && <ChildIcon className="w-4 h-4" />}
+                              {child.title}
+                            </Link>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
-                </Link>
-              );
+                );
+              } else {
+                // Non-clickable parent (no children)
+                return (
+                  <div
+                    key={item.id}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg text-left cursor-pointer transition-colors bg-white text-black`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className="w-5 h-5" />
+                      <span>{item.title}</span>
+                    </div>
+                  </div>
+                );
+              }
             })}
           </nav>
 
           {/* Pied de page (Statique) */}
           <div className="p-4 border-t" style={{ borderColor: "rgba(171, 184, 223, 0.3)" }}>
-            {userRole === 'admin' ? (
-              // Pied de page spécial pour les Admins
-              <div>
-                <div className="rounded-lg p-4 border mb-3" style={{ borderColor: "#000000" }}>
-                  <div className="flex items-center gap-3 mb-2"><Shield className="w-4 h-4 text-black" /> <p className="text-sm font-medium text-black">System Status</p></div>
-                  <p className="text-xs text-green-600">All systems operational</p>
-                </div>
-                <button
-                  className="w-full flex items-center justify-center gap-2 p-3 text-sm font-medium rounded-lg border border-black text-black hover:bg-red-50 hover:text-red-700 transition"
-                  onClick={async () => {
-                    setIsLoggingOut(true);
-                    await supabase.auth.signOut();
-                    window.location.href = '/';
-                  }}
-                  disabled={isLoggingOut}
-                >
-                  <LogOut className="w-4 h-4" /><span>Emergency Logout</span>
-                </button>
-              </div>
-            ) : (
-              // Pied de page standard pour Business et Utilisateur
-              <div>
+            <div>
+              {/* System Status supprimé */}
+              {userRole !== 'admin' && (
                 <div className="mb-3 p-3 bg-gray-50 rounded-lg">
                   <p className="text-sm font-medium text-black truncate">{userInfo?.full_name || 'User Name'}</p>
                   <p className="text-xs text-gray-500 capitalize">{userInfo?.role}</p>
                 </div>
-                <button
-                  className="w-full flex items-center justify-center gap-2 p-3 text-sm font-medium rounded-lg border border-black text-black hover:bg-red-50 hover:text-red-700 transition"
-                  onClick={async () => {
-                    setIsLoggingOut(true);
-                    await supabase.auth.signOut();
-                    window.location.href = '/login';
-                  }}
-                  disabled={isLoggingOut}
-                >
-                  <LogOut className="w-4 h-4" /><span>Logout</span>
-                </button>
-              </div>
-            )}
+              )}
+              <button
+                className="w-full flex items-center justify-center gap-2 p-3 text-sm font-medium rounded-lg border border-black text-black hover:bg-red-50 hover:text-red-700 transition"
+                onClick={async () => {
+                  setIsLoggingOut(true);
+                  await supabase.auth.signOut();
+                  window.location.href = '/login';
+                }}
+                disabled={isLoggingOut}
+              >
+                <LogOut className="w-4 h-4" /><span>Emergency Logout</span>
+              </button>
+            </div>
           </div>
         </div>
       {isLoggingOut && (
